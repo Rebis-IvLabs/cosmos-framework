@@ -21,4 +21,10 @@ TAIL_OVERRIDES=(
     ${EXTRA_TAIL_OVERRIDES:-}
 )
 NPROC_PER_NODE="${NPROC_PER_NODE:-1}"
+# torchcodec (cu130 build) dlopens libnppicc.so.13 / libnvrtc.so.13 at the first video decode;
+# torch does not preload NPP/NVRTC, so put the venv's CUDA-13 runtime libs on the loader path
+# (they come from the `nvidia-npp` / `nvidia-cuda-nvrtc` wheels of the cu130-train group).
+_CU13_LIB="$(python -c 'import nvidia, os, glob; print(":".join(sorted({os.path.dirname(f) for p in nvidia.__path__ for f in glob.glob(p + "/**/libnppicc.so.13", recursive=True) + glob.glob(p + "/**/libnvrtc.so.13", recursive=True)})))' 2>/dev/null || true)"
+if [[ -n "$_CU13_LIB" ]]; then export LD_LIBRARY_PATH="${_CU13_LIB}${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"; fi
+export PYTORCH_ALLOC_CONF="${PYTORCH_ALLOC_CONF:-expandable_segments:True}"
 source "$(dirname "${BASH_SOURCE[0]}")/_sft_launcher_common.sh"
