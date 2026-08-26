@@ -42,9 +42,8 @@ warm_up_steps = [200]
 [dataloader_train]
 max_samples_per_batch = 8   # per-rank samples (17-frame 256x512 clips); raise if memory allows
 
-[dataloader_train.dataloader]
-num_workers     = 8
-prefetch_factor = 2
+# Worker count is not a TOML key on this schema; pass it as a Hydra tail override:
+#   dataloader_train.dataloader.num_workers=8
 
 [trainer]
 max_iter        = 5000
