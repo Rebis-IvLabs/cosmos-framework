@@ -40,7 +40,7 @@ from cosmos_framework.inference.common.args import (
     tyro_cli,
 )
 from cosmos_framework.inference.common.checkpoints import register_checkpoints
-from cosmos_framework.inference.common.config import serialize_config_dict
+from cosmos_framework.inference.common.config import deserialize_config_dict, serialize_config_dict
 from cosmos_framework.inference.common.distillation_export import (
     build_student_checkpoint_metadata,
     resolve_vision_checkpoint_path,
@@ -98,23 +98,64 @@ def _dataset_config_value(dataset_config: Any, key: str) -> Any:
     return parameter.default
 
 
+def _load_training_config_for_policy(checkpoint_args: Any) -> Any:
+    """Training config for the Edge policy manifest, as a structured config when
+    possible and a raw dict otherwise.
+
+    Training runs save a plain OmegaConf dump of the experiment, which carries no
+    ``_type`` key, so the inference config structurer rejects it. The manifest only
+    needs a few dataset fields, and ``_config_value`` reads dicts as happily as
+    structured configs, so fall back to the raw dict instead of failing the export.
+    """
+    try:
+        return checkpoint_args.load_config()
+    except Exception as exc:  # noqa: BLE001 - any structuring failure is recoverable here
+        config_file = getattr(checkpoint_args, "config_file", None)
+        if not config_file:
+            raise
+        log.warning(f"Could not structure the training config ({exc}); reading {config_file} as a raw dict.")
+        return deserialize_config_dict(Path(config_file))
+
+
+def _iter_action_dataset_configs(training_config: Any) -> list[Any]:
+    """Action dataset configs, from either dataloader layout.
+
+    Internal action runs nest them under
+    ``dataloader_train.dataloaders.action_data.dataloader.dataset.list_of_datasets[*].dataset``;
+    the OSS action recipes (droid / libero / so101) use
+    ``dataloader_train.dataloader.datasets.<name>.dataset``.
+    """
+    dataloader_train = _config_value(training_config, "dataloader_train")
+    if dataloader_train is None:
+        raise ValueError("Cosmos3 Edge export requires a `dataloader_train` config.")
+
+    dataloaders = _config_value(dataloader_train, "dataloaders")
+    action_data = _config_value(dataloaders, "action_data") if dataloaders is not None else None
+    if action_data is not None:
+        dataset_config = _config_value(_config_value(action_data, "dataloader"), "dataset")
+        entries = _config_value(dataset_config, "list_of_datasets")
+        if entries:
+            return [_config_value(entry, "dataset") for entry in entries]
+
+    datasets = _config_value(_config_value(dataloader_train, "dataloader"), "datasets")
+    if datasets is not None and hasattr(datasets, "values"):
+        return [_config_value(entry, "dataset") for entry in datasets.values()]
+
+    raise ValueError(
+        "Cosmos3 Edge export requires an action dataset config at "
+        "dataloader_train.dataloaders.action_data.dataloader.dataset (internal layout) or "
+        "dataloader_train.dataloader.datasets.<name>.dataset (OSS layout)."
+    )
+
+
 def _build_edge_policy_metadata(training_config: Any) -> dict[str, Any]:
     """Resolve policy manifest fields from the action experiment config."""
-    try:
-        dataset_config = training_config.dataloader_train.dataloaders.action_data.dataloader.dataset
-    except AttributeError as exc:
-        raise ValueError(
-            "Cosmos3 Edge export requires an action dataset config at "
-            "dataloader_train.dataloaders.action_data.dataloader.dataset."
-        ) from exc
-
-    dataset_entries = _config_value(dataset_config, "list_of_datasets")
-    if not dataset_entries:
+    dataset_configs = _iter_action_dataset_configs(training_config)
+    if not dataset_configs:
         raise ValueError("Cosmos3 Edge export requires at least one action dataset entry.")
 
     metadata_by_dataset: list[dict[str, Any]] = []
-    for entry in dataset_entries:
-        action_dataset_config = _config_value(entry, "dataset")
+    for action_dataset_config in dataset_configs:
         if action_dataset_config is None:
             raise ValueError("Cosmos3 Edge action dataset entries must define a dataset config.")
 
@@ -388,7 +429,7 @@ def export_model(args: Args) -> None:
     # Only action Edge models carry an action dataloader; non-action Edge exports
     # (e.g. Edge SFT video recipes) skip this and stay unaffected.
     edge_policy_metadata = (
-        _build_edge_policy_metadata(checkpoint_args.load_config())
+        _build_edge_policy_metadata(_load_training_config_for_policy(checkpoint_args))
         if is_edge and model_dict["config"].get("action_gen")
         else None
     )
