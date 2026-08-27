@@ -24,6 +24,8 @@ source .venv/bin/activate
 if [[ -f ~/.env ]]; then set -a; source ~/.env; set +a; fi
 _CU13_LIB="$(python -c 'import nvidia, os, glob; print(":".join(sorted({os.path.dirname(f) for p in nvidia.__path__ for f in glob.glob(p + "/**/libnppicc.so.13", recursive=True)})))' 2>/dev/null || true)"
 export LD_LIBRARY_PATH="${_CU13_LIB}" PYTORCH_ALLOC_CONF=expandable_segments:True
+# hf_xet in the isolated hf CLI fails with "Unable to parse string as hex hash value" on this box; plain HTTP works.
+export HF_HUB_DISABLE_XET=1
 mkdir -p "$OUT/logs"
 
 for CKPT in "$@"; do
