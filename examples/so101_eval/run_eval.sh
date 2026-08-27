@@ -26,6 +26,8 @@ _CU13_LIB="$(python -c 'import nvidia, os, glob; print(":".join(sorted({os.path.
 export LD_LIBRARY_PATH="${_CU13_LIB}" PYTORCH_ALLOC_CONF=expandable_segments:True
 # hf_xet in the isolated hf CLI fails with "Unable to parse string as hex hash value" on this box; plain HTTP works.
 export HF_HUB_DISABLE_XET=1
+# the server loads the experiment config for introspection, which interpolates ${oc.env:SO101_ROOT}
+export SO101_ROOT="${SO101_ROOT:-$VAL_ROOT}" WAN_VAE_PATH
 mkdir -p "$OUT/logs"
 
 for CKPT in "$@"; do
