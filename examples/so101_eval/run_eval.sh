@@ -20,6 +20,8 @@ NUM_STEPS="${NUM_STEPS:-30}"
 GUIDANCE="${GUIDANCE:-1.0}"
 
 source .venv/bin/activate
+# HF_TOKEN (gated nvidia/Cosmos-Guardrail1 + processor downloads) and WANDB_API_KEY live in ~/.env on the box.
+if [[ -f ~/.env ]]; then set -a; source ~/.env; set +a; fi
 _CU13_LIB="$(python -c 'import nvidia, os, glob; print(":".join(sorted({os.path.dirname(f) for p in nvidia.__path__ for f in glob.glob(p + "/**/libnppicc.so.13", recursive=True)})))' 2>/dev/null || true)"
 export LD_LIBRARY_PATH="${_CU13_LIB}" PYTORCH_ALLOC_CONF=expandable_segments:True
 mkdir -p "$OUT/logs"
