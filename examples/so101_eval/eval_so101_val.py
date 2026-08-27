@@ -47,7 +47,7 @@ TASK = "Pick up the test-tube and place it in the holder on the helicopter"
 CHUNK = 16
 GT_COLOR = (67, 118, 168)  # gantry blue
 PR_COLOR = (214, 140, 52)  # bronze
-HUD_W = 256
+HUD_W = 272
 
 
 # ----------------------------------------------------------------------------- pose helpers
@@ -166,10 +166,12 @@ def render_frame(
     # chunk path inset on the generated frame (bottom-right corner)
     ix, iy, iw, ih = W - 132, 2 * H - 132, 124, 124
     d.rectangle([ix, iy, ix + iw, iy + ih], fill=(0, 0, 0, 140), outline=(90, 90, 90, 200))
-    xmin, xmax, ymin, ymax = ep_xy_bounds
-    sx = (iw - 12) / max(xmax - xmin, 1e-6)
-    sy = (ih - 12) / max(ymax - ymin, 1e-6)
-    s = min(sx, sy)
+    # chunk-local bounds (episode-wide bounds collapse a 1 s chunk to a dot); >= 3 cm extent
+    pts_xy = np.concatenate([gt_T[:, :2, 3], pr_T[:, :2, 3]])
+    cx_, cy_ = pts_xy.mean(0)
+    half = max(0.015, (pts_xy.max(0) - pts_xy.min(0)).max() / 2 + 0.004)
+    xmin, ymin = cx_ - half, cy_ - half
+    s = (iw - 12) / (2 * half)
 
     def to_inset(p):
         return (ix + 6 + (p[0] - xmin) * s, iy + ih - 6 - (p[1] - ymin) * s)
@@ -179,7 +181,7 @@ def render_frame(
         if len(pts) > 1:
             d.line(pts, fill=col + (230,), width=2)
     d.ellipse([to_inset(pr_T[step][:3, 3])[0] - 3, to_inset(pr_T[step][:3, 3])[1] - 3, to_inset(pr_T[step][:3, 3])[0] + 3, to_inset(pr_T[step][:3, 3])[1] + 3], fill=PR_COLOR)
-    d.text((ix + 4, iy + 2), "chunk xy", font=f_small, fill=(200, 200, 200))
+    d.text((ix + 4, iy + 2), f"chunk xy  ({2 * half * 100:.0f} cm box)", font=f_small, fill=(200, 200, 200))
 
     # HUD panel
     hx = W + 10
@@ -217,7 +219,7 @@ def render_frame(
     d.text((hx, xy + 18), f"gt   {g[0]:6.3f} {g[1]:6.3f} {g[2]:6.3f}", font=f_small, fill=GT_COLOR)
     d.text((hx, xy + 34), f"pred {p[0]:6.3f} {p[1]:6.3f} {p[2]:6.3f}", font=f_small, fill=PR_COLOR)
     d.text((hx, 2 * H - 40), "blue = ground truth", font=f_small, fill=GT_COLOR)
-    d.text((hx, 2 * H - 24), "bronze = predicted (re-anchored per chunk)", font=f_small, fill=PR_COLOR)
+    d.text((hx, 2 * H - 24), "bronze = predicted, re-anchored per chunk", font=f_small, fill=PR_COLOR)
     return np.asarray(canvas)
 
 
