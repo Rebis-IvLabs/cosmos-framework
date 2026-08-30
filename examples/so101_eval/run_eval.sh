@@ -16,6 +16,8 @@ WAN_VAE_PATH="${WAN_VAE_PATH:-/data/cosmos3/checkpoints/wan22_vae/Wan2.2_VAE.pth
 OUT="${OUT:-/data/cosmos3/eval}"
 PORT="${PORT:-8000}"
 EPISODES="${EPISODES:-}"
+EXPERIMENT="${EXPERIMENT:-action_policy_so101_edge}"   # ..._wrist for the wrist-only checkpoints
+CAMERA_MODE="${CAMERA_MODE:-concat_view}"            # must match the experiment
 NUM_STEPS="${NUM_STEPS:-30}"
 GUIDANCE="${GUIDANCE:-1.0}"
 
@@ -35,7 +37,7 @@ for CKPT in "$@"; do
     [[ -d "$CKPT_PATH" ]] || { echo "missing $CKPT_PATH" >&2; exit 1; }
     echo ">>> $(date -u +%H:%M:%S) server for $CKPT"
     python -m cosmos_framework.scripts.action_policy_server_libero \
-        --experiment action_policy_so101_edge \
+        --experiment "$EXPERIMENT" \
         --experiment-overrides "model.config.tokenizer.vae_path=$WAN_VAE_PATH" \
         --checkpoint-path "$CKPT_PATH" \
         --action-normalization quantile_rot --action-stats-path "$STATS" \
@@ -51,7 +53,7 @@ for CKPT in "$@"; do
     curl -sf "http://127.0.0.1:$PORT/info" >/dev/null || { echo "server never became ready" >&2; kill $SERVER_PID; exit 1; }
     echo ">>> $(date -u +%H:%M:%S) eval $CKPT"
     python examples/so101_eval/eval_so101_val.py --root "$VAL_ROOT" --stats "$STATS" \
-        --server "http://127.0.0.1:$PORT" --checkpoint-name "$CKPT" --out "$OUT" \
+        --server "http://127.0.0.1:$PORT" --checkpoint-name "$CKPT" --out "$OUT" --camera-mode "$CAMERA_MODE" \
         ${EPISODES:+--episodes "$EPISODES"} 2>&1 | tee "$OUT/logs/eval_${CKPT}.log"
     kill $SERVER_PID 2>/dev/null || true
     wait $SERVER_PID 2>/dev/null || true

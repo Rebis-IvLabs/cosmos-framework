@@ -262,12 +262,19 @@ def main() -> int:
     ap.add_argument("--fps", type=int, default=15)
     ap.add_argument("--image-size", type=int, default=256)
     ap.add_argument("--no-video", action="store_true")
+    ap.add_argument(
+        "--camera-mode",
+        default="concat_view",
+        choices=("concat_view", "wrist_image", "image"),
+        help="must match what the checkpoint trained on (action_policy_so101_edge = concat_view, "
+        "action_policy_so101_edge_wrist = wrist_image)",
+    )
     args = ap.parse_args()
 
     stats = json.load(open(args.stats))
     ds = LIBEROLeRobotDataset(
         root=str(args.root), image_size=args.image_size, chunk_length=CHUNK, fps=args.fps, mode="wam",
-        split="full", val_ratio=0.5, seed=0, camera_mode="concat_view", action_space="frame_wise_relative",
+        split="full", val_ratio=0.5, seed=0, camera_mode=args.camera_mode, action_space="frame_wise_relative",
         rotation_space="6d", pose_coordinate_frame="native", action_normalization="quantile_rot",
         action_stats_path=str(args.stats), embodiment_type="so101",
     )
