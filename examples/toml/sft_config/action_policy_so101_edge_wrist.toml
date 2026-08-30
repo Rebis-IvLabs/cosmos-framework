@@ -54,4 +54,5 @@ grad_accum_iter = 8       # effective batch = 8 x 1 x 8 = 64
 
 [checkpoint]
 load_path = "${oc.env:BASE_CHECKPOINT_PATH}"
-save_iter = 500
+save_iter = 2000   # DCP checkpoints are ~36 GB each and nothing prunes them: 10000/2000 = 5
+                   # checkpoints = ~180 GB. save_iter 500 would need ~720 GB.
