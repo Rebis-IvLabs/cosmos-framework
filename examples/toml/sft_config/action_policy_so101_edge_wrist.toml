@@ -8,7 +8,7 @@
 # A100 80GB): FSDP shard 1 x replicate 1, 8 samples per rank x grad_accum 8 =
 # effective batch 64. The dataset is small (270 episodes, ~77k frames at 15 fps,
 # ~4.8k distinct 17-frame windows per epoch at chunk 16), so iters are set for
-# ~4 epochs; tune after the first run.
+# ~8 epochs; the concat-view run's 5000 iters were still improving at the end.
 # Env: SO101_ROOT, BASE_CHECKPOINT_PATH (Cosmos3-Edge DCP), WAN_VAE_PATH, IMAGINAIRE_OUTPUT_ROOT.
 
 [job]
@@ -38,7 +38,7 @@ vae_path = "${oc.env:WAN_VAE_PATH}"
 lr = 5.0e-05
 
 [scheduler]
-cycle_lengths = [5000]
+cycle_lengths = [10000]
 warm_up_steps = [200]
 
 [dataloader_train]
@@ -48,7 +48,7 @@ max_samples_per_batch = 8   # per-rank samples (17-frame 256x512 clips); raise i
 #   dataloader_train.dataloader.num_workers=8
 
 [trainer]
-max_iter        = 5000
+max_iter        = 10000
 logging_iter    = 50
 grad_accum_iter = 8       # effective batch = 8 x 1 x 8 = 64
 
